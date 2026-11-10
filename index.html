@@ -18,25 +18,27 @@
   --p0:#ff6b5e;--p1:#7f9bff;--p2:#4ade80;--p3:#fbbf24;--p4:#c4a1ff;--p5:#22d3ee}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 "Avenir Next",ui-sans-serif,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
-main{max-width:46rem;margin:0 auto;padding:1.5rem 1.25rem 3rem}
+main{max-width:46rem;margin:0 auto;padding:1.5rem 1.25rem calc(6.5rem + env(safe-area-inset-bottom,0px))}
+button{font:inherit}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
 #clock{font-size:3.5rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
 #date{color:var(--mute);margin-top:.25rem}
 #add{flex:none;width:3.25rem;height:3.25rem;border-radius:50%;border:2px solid var(--ink);background:transparent;color:var(--ink);font-size:2rem;line-height:1;padding:0 0 .2rem;touch-action:manipulation}
 
 /* One column per category, side by side. Scrolls sideways when there are many. */
-#cols{display:flex;gap:.75rem;overflow-x:auto;scroll-snap-type:x proximity;margin:1.5rem -1.25rem 0;padding:0 1.25rem .5rem;scroll-padding:0 1.25rem}
+.cols{display:flex;gap:.75rem;overflow-x:auto;scroll-snap-type:x proximity;margin:1.5rem -1.25rem 0;padding:0 1.25rem .5rem;scroll-padding:0 1.25rem}
 .col{flex:0 0 10.5rem;display:flex;flex-direction:column;gap:.5rem;scroll-snap-align:start}
 .log-btn{appearance:none;border:2px solid var(--col);background:var(--card);color:var(--ink);border-radius:1.25rem;padding:.8rem .9rem;
-  font:inherit;text-align:left;width:100%;height:7.5rem;display:flex;flex-direction:column;justify-content:space-between;touch-action:manipulation}
+  text-align:left;width:100%;height:7.5rem;display:flex;flex-direction:column;justify-content:space-between;touch-action:manipulation}
 .log-btn .name{font-size:1.1rem;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .log-btn .n{font-size:2.25rem;font-weight:700;line-height:1;color:var(--col);font-variant-numeric:tabular-nums}
+.log-btn .n.dur{font-size:1.6rem;line-height:1.4}
 .log-btn small{color:var(--mute)}
-.log-btn.armed{background:var(--col);color:var(--bg);border-color:var(--col)}
-.log-btn.armed .n,.log-btn.armed small{color:var(--bg)}
+.log-btn.armed,.log-btn.running{background:var(--col);color:var(--bg);border-color:var(--col)}
+.log-btn.armed .n,.log-btn.armed small,.log-btn.running .n,.log-btn.running small{color:var(--bg)}
 
 /* Fixed-size entry box: the page never grows, the box scrolls. */
-.entries{list-style:none;margin:0;padding:0 .7rem;height:15rem;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+.entries{list-style:none;margin:0;padding:0 .7rem;height:13rem;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   background:var(--card);border:1px solid var(--line);border-radius:.9rem}
 .entries li{padding:.5rem 0;border-bottom:1px solid var(--line)}
 .entries li:last-child{border-bottom:0}
@@ -44,16 +46,30 @@ main{max-width:46rem;margin:0 auto;padding:1.5rem 1.25rem 3rem}
 .entries .d{display:block;color:var(--mute);font-size:.85rem}
 .entries .empty,.empty{color:var(--mute)}
 .tools{display:flex;gap:.4rem}
-button{font:inherit}
-.tools button,.row button{flex:1;padding:.6rem;border-radius:.7rem;border:1px solid var(--line);background:var(--card);color:var(--ink);touch-action:manipulation}
+.tools button,.discard,.row button{padding:.6rem;border-radius:.7rem;border:1px solid var(--line);background:var(--card);color:var(--ink);touch-action:manipulation}
+.tools button,.row button{flex:1}
 .tools .del{color:var(--p0)}
+.discard:disabled{opacity:.4}
 
-h2{font-size:1rem;margin:2rem 0 .5rem}
-textarea{width:100%;height:5rem;font:.8rem ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:.6rem;padding:.5rem}
+h1{font-size:1.75rem;margin:0 0 .5rem}
+h2{font-size:1rem;margin:1.5rem 0 .5rem}
+textarea{width:100%;height:7rem;font:.8rem ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:.6rem;padding:.5rem}
 .row{display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap}
 .row button{padding:.7rem}
 #clear.armed{background:var(--p0);color:var(--bg);border-color:var(--p0)}
-#msg{min-height:1.5rem;color:var(--mute);margin-top:1rem}
+
+/* Tab bar */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;gap:.25rem;background:var(--card);border-top:1px solid var(--line);
+  padding:.4rem .5rem calc(.4rem + env(safe-area-inset-bottom,0px))}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:.1rem;padding:.45rem 0 .35rem;border:0;border-radius:1rem;
+  background:none;color:var(--mute);font-size:.75rem;font-weight:600;touch-action:manipulation}
+nav svg{width:1.7rem;height:1.7rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+nav button[aria-selected=true]{background:var(--bg);color:var(--ink);box-shadow:inset 0 3px 0 var(--ink)}
+nav button[aria-selected=true] svg{transform:translateY(-.15rem) scale(1.15)}
+
+#msg{position:fixed;left:50%;bottom:calc(5.5rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:6;max-width:90vw;
+  background:var(--ink);color:var(--bg);padding:.5rem 1rem;border-radius:2rem;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
+#msg.show{opacity:1}
 dialog{border:1px solid var(--line);border-radius:1rem;background:var(--card);color:var(--ink);padding:1.25rem;width:min(22rem,90vw)}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog input{width:100%;font:inherit;padding:.6rem;margin-top:.4rem;border-radius:.6rem;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
@@ -63,15 +79,18 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,.entries:focus-v
 </head>
 <body>
 <main>
-  <div class="top">
+  <div class="top" id="top">
     <div>
       <div id="clock">--:--:--</div>
       <div id="date"></div>
     </div>
     <button id="add" aria-label="Add category">+</button>
   </div>
-  <section id="cols" aria-label="Categories"></section>
-  <section>
+
+  <section id="page-tally" role="tabpanel" aria-labelledby="tab-tally"><div class="cols" id="colsTally"></div></section>
+  <section id="page-periods" role="tabpanel" aria-labelledby="tab-periods" hidden><div class="cols" id="colsPeriods"></div></section>
+  <section id="page-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <h1>Settings</h1>
     <h2>Backup</h2>
     <textarea id="box" placeholder="Export fills this box. To import, paste a backup here." aria-label="Backup text"></textarea>
     <div class="row">
@@ -80,8 +99,21 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,.entries:focus-v
       <button id="clear">Clear entries</button>
     </div>
   </section>
-  <p id="msg" role="status"></p>
 </main>
+
+<div id="msg" role="status" aria-live="polite"></div>
+
+<nav role="tablist" aria-label="Main">
+  <button role="tab" id="tab-tally" aria-selected="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M9.5 5v14M14 5v14M18.5 5v14M3 17L21 7"/></svg>Tally marks
+  </button>
+  <button role="tab" id="tab-periods" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M10 2.5h4M12 2.5V7M12 14l3-3M19 6.5l1.2-1.2"/></svg>Time periods
+  </button>
+  <button role="tab" id="tab-settings" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg>Settings
+  </button>
+</nav>
 
 <dialog id="dlg">
   <form id="dlgForm">
@@ -96,24 +128,39 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,.entries:focus-v
 </dialog>
 
 <script>
-const KEY = 'procrastination timestamps';   // same key as before
+const KEY = 'procrastination timestamps';   // all categories and their entries
+const RUN_KEY = 'procrastination running';  // timers that are started but not stopped yet
+const TM = 'tally marks', TP = 'time periods';
 const DEFAULTS = ['yt', 'r34'];             // categories created on the very first run
 const CONFIRM_MS = 3000;                    // time you have for the second tap
 
 // ---- Storage ----
-// Data shape (unchanged): {"<category>": [{"2026-11-10": {"14-3-5": timestamp}}, ...], ...}
-// Every top-level key is a category, so adding, renaming or deleting one just edits the keys.
+// {"<category>": {"tally marks": [{"2026-11-10": {"13-24-55": ms}}],
+//                 "time periods": [{"start": {...same shape...}, "end": {...}}]}}
+// Older backups, where a category was just an array of tally marks, are converted when loaded.
 function parseJSON(text){ try { return JSON.parse(text); } catch(e){ return null; } }
 function isObj(d){ return d && typeof d === 'object' && !Array.isArray(d); }
-function validData(d){
-  return isObj(d) && Object.keys(d).length > 0 && Object.keys(d).every(k => k !== '__proto__' && Array.isArray(d[k]));
+function normalize(d, strict){           // returns a clean copy in the new schema, or null (strict) / skips bad categories (lenient)
+  if (!isObj(d)) return null;
+  const out = {};
+  for (const k of Object.keys(d)) {
+    const v = d[k];
+    let tm, tp;
+    if (k === '__proto__') { if (strict) return null; continue; }
+    if (Array.isArray(v)) { tm = v; tp = []; }                                              // old schema
+    else if (isObj(v) && (Array.isArray(v[TM]) || Array.isArray(v[TP]))) { tm = Array.isArray(v[TM]) ? v[TM] : []; tp = Array.isArray(v[TP]) ? v[TP] : []; }
+    else { if (strict) return null; continue; }
+    out[k] = {[TM]: tm, [TP]: tp};
+  }
+  return strict && !Object.keys(out).length ? null : out;
 }
+const blank = () => ({[TM]: [], [TP]: []});
 function load(){
   let raw = null;
   try { raw = localStorage.getItem(KEY); } catch(e){}
-  const d = parseJSON(raw), out = {};
-  if (isObj(d)) { Object.keys(d).forEach(k => { if (k !== '__proto__' && Array.isArray(d[k])) out[k] = d[k]; }); return out; }
-  DEFAULTS.forEach(k => out[k] = []);
+  const d = normalize(parseJSON(raw), false);
+  if (d) return d;
+  const out = {}; DEFAULTS.forEach(k => out[k] = blank());
   return out;
 }
 function save(){
@@ -122,23 +169,48 @@ function save(){
 }
 let data = load();
 
+// Running timers live in their own key so they survive closing the app: {"<category>": startMs}
+function loadRunning(){
+  let raw = null;
+  try { raw = localStorage.getItem(RUN_KEY); } catch(e){}
+  const m = new Map(), d = parseJSON(raw);
+  if (isObj(d)) Object.keys(d).forEach(k => { if (k !== '__proto__' && Object.prototype.hasOwnProperty.call(data, k) && Number.isFinite(d[k])) m.set(k, d[k]); });
+  return m;
+}
+function saveRunning(){
+  try { localStorage.setItem(RUN_KEY, JSON.stringify(Object.fromEntries(running))); return true; }
+  catch(e){ say('Could not save. Storage is full or blocked.'); return false; }
+}
+function pruneRunning(){
+  for (const k of [...running.keys()]) if (!Object.prototype.hasOwnProperty.call(data, k)) running.delete(k);
+  saveRunning();
+}
+const running = loadRunning();
+
 // ---- Helpers ----
 const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
 const dateKey = t => `${t.getFullYear()}-${t.getMonth()+1}-${t.getDate()}`;
 const timeKey = t => `${t.getHours()}-${t.getMinutes()}-${t.getSeconds()}`;
-function say(text){ $('msg').textContent = text; }
+const stamp = ms => { const t = new Date(ms); return {[dateKey(t)]: {[timeKey(t)]: ms}}; };   // -> {"2026-11-10": {"13-24-55": ms}}
+const hms = ms => { const s = Math.floor(Math.max(0, ms) / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}`; };
+let msgTimer = null;
+function say(text){
+  const m = $('msg'); m.textContent = text; m.classList.add('show');
+  clearTimeout(msgTimer); msgTimer = setTimeout(() => m.classList.remove('show'), 2500);
+}
 function el(tag, cls, text){
   const e = document.createElement(tag);
   if (cls) e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
 }
-function entries(name){            // flatten the nested JSON into [{when: Date}]
+function entries(name){            // tally marks -> [{when: Date}] (read from the date and time keys)
   const out = [];
-  for (const e of data[name]) {
-    if (!e || typeof e !== 'object') continue;
+  for (const e of data[name][TM]) {
+    if (!isObj(e)) continue;
     for (const [d, times] of Object.entries(e)) {
-      if (!times || typeof times !== 'object') continue;
+      if (!isObj(times)) continue;
       for (const tm of Object.keys(times)) {
         const [Y, M, D] = d.split('-').map(Number), [h, m, s] = tm.split('-').map(Number);
         const when = new Date(Y, M - 1, D, h, m, s);
@@ -148,20 +220,39 @@ function entries(name){            // flatten the nested JSON into [{when: Date}
   }
   return out;
 }
+function stampDate(o){             // {"date": {"time": ms}} -> Date. Uses the ms value, falls back to the keys.
+  if (!isObj(o)) return null;
+  const d = Object.keys(o)[0], times = o[d];
+  if (!isObj(times)) return null;
+  const tm = Object.keys(times)[0];
+  if (tm === undefined) return null;
+  if (typeof times[tm] === 'number' && times[tm] > 1e11) return new Date(times[tm]);
+  const [Y, M, D] = d.split('-').map(Number), [h, m, s] = tm.split('-').map(Number);
+  const when = new Date(Y, M - 1, D, h, m, s);
+  return isNaN(when) ? null : when;
+}
+function periods(name){            // time periods -> [{start: Date, end: Date, dur: ms}]
+  const out = [];
+  for (const e of data[name][TP]) {
+    if (!isObj(e)) continue;
+    const start = stampDate(e.start), end = stampDate(e.end);
+    if (start && end) out.push({start, end, dur: Math.max(0, end - start)});
+  }
+  return out;
+}
 function nameError(name, self){
   if (!name) return 'Enter a name.';
   if (name === '__proto__') return 'That name is not allowed.';
   if (Object.keys(data).some(k => k !== self && k.toLowerCase() === name.toLowerCase())) return 'A category with that name already exists.';
   return '';
 }
-// Replace `data` with a new object, keep the old one if saving fails.
-function commit(next){
+function commit(next){             // replace `data`, keep the old one if saving fails
   const old = data; data = next;
   if (save()) return true;
   data = old; return false;
 }
 
-// ---- Logging with a second-tap confirmation ----
+// ---- Tally marks: second-tap confirmation ----
 let armed = null, armTimer = null;
 function tap(name){
   clearTimeout(armTimer);
@@ -170,12 +261,28 @@ function tap(name){
   render();
 }
 function addEntry(name){
-  const t = new Date();
-  data[name].push({[dateKey(t)]: {[timeKey(t)]: Math.floor(t / 1000)}});
-  if (!save()) data[name].pop(); else say(`Logged in "${name}".`);
+  data[name][TM].push(stamp(Date.now()));
+  if (!save()) data[name][TM].pop(); else say(`Logged in "${name}".`);
 }
 
-// ---- Categories: add / edit / delete ----
+// ---- Time periods: first tap starts, second tap saves start and end ----
+function toggleTimer(name){
+  if (!running.has(name)) {
+    running.set(name, Date.now());
+    if (!saveRunning()) running.delete(name); else say(`Started "${name}".`);
+  } else {
+    const start = running.get(name), end = Date.now();
+    data[name][TP].push({start: stamp(start), end: stamp(end)});
+    if (!save()) data[name][TP].pop();
+    else { running.delete(name); saveRunning(); say(`Saved ${hms(end - start)} in "${name}".`); }
+  }
+  render();
+}
+function discardTimer(name){
+  running.delete(name); saveRunning(); say(`Timer for "${name}" discarded.`); render();
+}
+
+// ---- Categories: add / edit / delete (shared by both tabs) ----
 let dlgSubmit = null;
 function askName(title, initial, submit){
   $('dlgTitle').textContent = title; $('dlgInput').value = initial; $('dlgErr').textContent = '';
@@ -191,7 +298,7 @@ $('dlgCancel').onclick = () => $('dlg').close();
 function addCategory(){
   askName('Name for the new category', '', name => {
     const err = nameError(name); if (err) return err;
-    if (!commit({...data, [name]: []})) return 'Could not save.';
+    if (!commit({...data, [name]: blank()})) return 'Could not save.';
     render(); say(`Added "${name}".`); return '';
   });
 }
@@ -202,60 +309,107 @@ function editCategory(old){
     const next = {};
     Object.keys(data).forEach(k => { next[k === old ? name : k] = data[k]; });   // keeps column order
     if (!commit(next)) return 'Could not save.';
+    if (running.has(old)) { running.set(name, running.get(old)); running.delete(old); saveRunning(); }
     armed = null; render(); say(`Renamed to "${name}".`); return '';
   });
 }
 function deleteCategory(name){
-  const n = data[name].length;
-  if (!confirm(`Delete "${name}" and its ${n} entr${n === 1 ? 'y' : 'ies'}? This cannot be undone.`)) return;
+  const a = data[name][TM].length, b = data[name][TP].length;
+  if (!confirm(`Delete "${name}" with its ${a} tally mark${a === 1 ? '' : 's'} and ${b} time period${b === 1 ? '' : 's'}? This cannot be undone.`)) return;
   const next = {...data}; delete next[name];
-  if (commit(next)) { armed = null; render(); say(`Deleted "${name}".`); }
+  if (commit(next)) { running.delete(name); saveRunning(); armed = null; render(); say(`Deleted "${name}".`); }
 }
 
 // ---- Rendering ----
-function buildColumn(name, i, today){
-  const all = entries(name);
+function buildColumn(name, i, mode){
   const col = el('div', 'col'); col.style.setProperty('--col', `var(--p${i % 6})`);
-
-  const btn = el('button', 'log-btn' + (armed === name ? ' armed' : '')); btn.title = name;
-  btn.append(el('span', 'name', name),
-             el('span', 'n', all.filter(e => dateKey(e.when) === today).length),
-             el('small', '', armed === name ? 'Tap again to log' : `${all.length} in total`));
-  btn.onclick = () => tap(name);
-
+  const btn = el('button', 'log-btn'); btn.title = name; btn.dataset.key = name;
   const ul = el('ul', 'entries'); ul.dataset.key = name; ul.tabIndex = 0; ul.setAttribute('aria-label', `Entries for ${name}`);
-  if (!all.length) ul.appendChild(el('li', 'empty', 'No entries yet.'));
-  all.sort((a, b) => b.when - a.when).forEach(e => {
-    const li = el('li');
-    li.append(el('span', 't', e.when.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})),
-              el('span', 'd', e.when.toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'})));
-    ul.appendChild(li);
-  });
+  const now = new Date(), today = dateKey(now);
+
+  if (mode === 'tally') {
+    const all = entries(name);
+    if (armed === name) btn.classList.add('armed');
+    btn.append(el('span', 'name', name),
+               el('span', 'n', all.filter(e => dateKey(e.when) === today).length),
+               el('small', '', armed === name ? 'Tap again to log' : `${all.length} in total`));
+    btn.onclick = () => tap(name);
+    if (!all.length) ul.appendChild(el('li', 'empty', 'No entries yet.'));
+    all.sort((a, b) => b.when - a.when).forEach(e => {
+      const li = el('li');
+      li.append(el('span', 't', e.when.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})),
+                el('span', 'd', e.when.toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'})));
+      ul.appendChild(li);
+    });
+  } else {
+    const all = periods(name), run = running.get(name);
+    const todays = all.filter(p => dateKey(p.start) === today);
+    if (run !== undefined) btn.classList.add('running');
+    btn.append(el('span', 'name', name),
+               run !== undefined ? el('span', 'n dur', hms(Date.now() - run)) : el('span', 'n', todays.length),
+               el('small', '', run !== undefined ? 'Tap to stop' : `${hms(todays.reduce((s, p) => s + p.dur, 0))} today`));
+    btn.onclick = () => toggleTimer(name);
+    if (!all.length) ul.appendChild(el('li', 'empty', 'No time periods yet.'));
+    const t = d => d.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+    const day = d => d.toLocaleDateString([], {weekday: 'short', day: 'numeric', month: 'short'});
+    all.sort((a, b) => b.start - a.start).forEach(p => {
+      const li = el('li');
+      li.append(el('span', 't', hms(p.dur)),
+                el('span', 'd', `${day(p.start)} · ${t(p.start)} – ${dateKey(p.start) === dateKey(p.end) ? '' : day(p.end) + ' · '}${t(p.end)}`));
+      ul.appendChild(li);
+    });
+  }
 
   const tools = el('div', 'tools');
   const ed = el('button', '', 'Edit'); ed.setAttribute('aria-label', `Edit ${name}`); ed.onclick = () => editCategory(name);
   const rm = el('button', 'del', 'Delete'); rm.setAttribute('aria-label', `Delete ${name}`); rm.onclick = () => deleteCategory(name);
   tools.append(ed, rm);
-
   col.append(btn, ul, tools);
+  if (mode === 'periods') {
+    const dis = el('button', 'discard', 'Discard timer'); dis.disabled = !running.has(name); dis.onclick = () => discardTimer(name);
+    col.appendChild(dis);
+  }
   return col;
 }
-function render(){
-  const cols = $('cols'), left = cols.scrollLeft, tops = new Map();
+function renderCols(cols, mode){
+  const left = cols.scrollLeft, tops = new Map();
   cols.querySelectorAll('.entries').forEach(u => tops.set(u.dataset.key, u.scrollTop));
   cols.replaceChildren();
-  const names = Object.keys(data), today = dateKey(new Date());
+  const names = Object.keys(data);
   if (!names.length) cols.appendChild(el('p', 'empty', 'No categories yet. Tap + to add one.'));
-  names.forEach((name, i) => cols.appendChild(buildColumn(name, i, today)));
+  names.forEach((name, i) => cols.appendChild(buildColumn(name, i, mode)));
   cols.scrollLeft = left;
   cols.querySelectorAll('.entries').forEach(u => { if (tops.has(u.dataset.key)) u.scrollTop = tops.get(u.dataset.key); });
 }
+function render(){
+  if (tab === 'tally') renderCols($('colsTally'), 'tally');
+  else if (tab === 'periods') renderCols($('colsPeriods'), 'periods');
+}
+
+// ---- Tabs ----
+const TABS = ['tally', 'periods', 'settings'];
+let tab = 'tally';
+function setTab(t){
+  tab = t;
+  TABS.forEach(n => {
+    $('page-' + n).hidden = n !== t;
+    $('tab-' + n).setAttribute('aria-selected', n === t ? 'true' : 'false');
+  });
+  $('top').hidden = t === 'settings';
+  render();
+}
+TABS.forEach(n => { $('tab-' + n).onclick = () => setTab(n); });
+
+// ---- Clock (also keeps running timers ticking without rebuilding the page) ----
 let lastDay = dateKey(new Date());
 function tick(){
   const now = new Date();
   $('clock').textContent = now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
   $('date').textContent = now.toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'});
-  if (dateKey(now) !== lastDay) { lastDay = dateKey(now); render(); }   // new day: refresh "today" counts
+  if (dateKey(now) !== lastDay) { lastDay = dateKey(now); render(); }   // new day: refresh "today" numbers
+  if (tab === 'periods') $('colsPeriods').querySelectorAll('.running').forEach(b => {
+    b.children[1].textContent = hms(Date.now() - running.get(b.dataset.key));
+  });
 }
 
 // ---- Backup ----
@@ -307,12 +461,12 @@ function lzDecompressUTF16(input){
 function importData(){
   const text = $('box').value.trim();
   if (!text) return say('Paste a backup into the box first.');
-  let obj = parseJSON(text);
-  if (!validData(obj)) { try { obj = parseJSON(lzDecompressUTF16(text)); } catch(e){ obj = null; } }
-  if (!validData(obj)) return say('That is not a valid backup. Nothing was changed.');
-  const count = o => Object.keys(o).reduce((n, k) => n + o[k].length, 0);
+  let obj = normalize(parseJSON(text), true);
+  if (!obj) { try { obj = normalize(parseJSON(lzDecompressUTF16(text)), true); } catch(e){ obj = null; } }
+  if (!obj) return say('That is not a valid backup. Nothing was changed.');
+  const count = o => Object.keys(o).reduce((n, k) => n + o[k][TM].length + o[k][TP].length, 0);
   if (!confirm(`Replace your ${Object.keys(data).length} categories (${count(data)} entries) with ${Object.keys(obj).length} categories (${count(obj)} entries) from this backup?`)) return say('Import cancelled.');
-  if (commit(obj)) { armed = null; say('Imported.'); }
+  if (commit(obj)) { armed = null; pruneRunning(); say('Imported.'); }
   render();
 }
 let clearTimer = null;
@@ -324,13 +478,13 @@ function clearEntries(){
     return;
   }
   clearTimeout(clearTimer); b.classList.remove('armed'); b.textContent = 'Clear entries';
-  const next = {}; Object.keys(data).forEach(k => next[k] = []);   // keeps the categories, removes their entries
+  const next = {}; Object.keys(data).forEach(k => next[k] = blank());   // keeps the categories, removes their entries
   if (commit(next)) say('All entries cleared. Categories kept.');
   render();
 }
 
 // ---- Start ----
-render(); tick();
+setTab('tally'); tick();
 setInterval(tick, 1000);
 $('add').onclick = addCategory; $('exp').onclick = exportData; $('imp').onclick = importData; $('clear').onclick = clearEntries;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
