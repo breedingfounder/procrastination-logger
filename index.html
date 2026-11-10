@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eceff1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Logger">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Procrastination Logger</title>
+<style>
+:root{--bg:#eceff1;--ink:#17212b;--mute:#667684;--line:#cbd3d9;--card:#f8fafb;--c1:#d92d20;--c2:#3b5bdb;
+  color-scheme:light dark;box-sizing:border-box;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+@media(prefers-color-scheme:dark){:root{--bg:#10161c;--ink:#e8edf0;--mute:#8e9ca8;--line:#2a343d;--card:#18212a;--c1:#ff6b5e;--c2:#7f9bff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 "Avenir Next",ui-sans-serif,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:30rem;margin:0 auto;padding:1.5rem 1.25rem 3rem}
+#clock{font-size:3.5rem;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+#date{color:var(--mute);margin-top:.25rem}
+#buttons{display:grid;gap:.75rem;margin:1.75rem 0}
+.log-btn{appearance:none;border:2px solid var(--col);background:var(--card);color:var(--ink);border-radius:1.25rem;padding:1.1rem 1.25rem;
+  display:flex;justify-content:space-between;align-items:center;font:inherit;text-align:left;width:100%;min-height:5.5rem;touch-action:manipulation}
+.log-btn b{display:block;font-size:1.25rem}
+.log-btn small{color:var(--mute)}
+.log-btn .n{font-size:2.25rem;font-weight:700;color:var(--col);font-variant-numeric:tabular-nums}
+.log-btn.armed{background:var(--col);color:#fff;border-color:var(--col)}
+.log-btn.armed small,.log-btn.armed .n{color:#fff}
+h2{font-size:1rem;margin:2rem 0 .5rem}
+ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+li{display:flex;gap:.6rem;align-items:center;padding:.55rem 0;border-bottom:1px solid var(--line)}
+li i{width:.7rem;height:.7rem;border-radius:50%;background:var(--col);flex:none}
+li span:last-child{margin-left:auto;color:var(--mute)}
+.empty{color:var(--mute);padding:.6rem 0}
+textarea{width:100%;height:5rem;font:.8rem ui-monospace,monospace;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:.6rem;padding:.5rem}
+.row{display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap}
+.row button{flex:1;font:inherit;padding:.7rem;border-radius:.7rem;border:1px solid var(--line);background:var(--card);color:var(--ink);touch-action:manipulation}
+#del.armed{background:var(--c1);color:#fff;border-color:var(--c1)}
+#msg{min-height:1.5rem;color:var(--mute);margin-top:1rem}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--c2);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+  <div id="clock">--:--:--</div>
+  <div id="date"></div>
+  <section id="buttons" aria-label="Log an entry"></section>
+  <section>
+    <h2>Recent</h2>
+    <ul id="log"></ul>
+  </section>
+  <section>
+    <h2>Backup</h2>
+    <textarea id="box" placeholder="Export fills this box. To import, paste a backup here." aria-label="Backup text"></textarea>
+    <div class="row">
+      <button id="exp">Export</button>
+      <button id="imp">Import</button>
+      <button id="del">Delete all</button>
+    </div>
+  </section>
+  <p id="msg" role="status"></p>
+</main>
+<script>
+// ---- Settings: add, rename or remove categories here ----
+const KEY = 'procrastination timestamps';          // same key as the Scratch version
+const CATEGORIES = [
+  {key: 'yt',  label: 'YouTube Shorts', color: 'var(--c1)'},
+  {key: 'r34', label: 'r34',            color: 'var(--c2)'},
+];
+const CONFIRM_MS = 3000;                            // time you have for the second tap
+
+// ---- Storage. Data shape (same as the Scratch version): {yt:[{"2026-11-10":{"14-3-5":timestamp}}], r34:[...]} ----
+function parseJSON(text){ try { return JSON.parse(text); } catch(e){ return null; } }
+function validData(d){ return d && typeof d === 'object' && !Array.isArray(d) && CATEGORIES.every(c => Array.isArray(d[c.key])); }
+function load(){
+  let d = parseJSON(localStorage.getItem(KEY));
+  if (!d || typeof d !== 'object' || Array.isArray(d)) d = {};
+  CATEGORIES.forEach(c => { if (!Array.isArray(d[c.key])) d[c.key] = []; });
+  return d;
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(data)); return true; }
+  catch(e){ say('Could not save. Storage is full or blocked.'); return false; }
+}
+let data = load();
+
+// ---- Helpers ----
+const $ = id => document.getElementById(id);
+const dateKey = t => `${t.getFullYear()}-${t.getMonth()+1}-${t.getDate()}`;
+const timeKey = t => `${t.getHours()}-${t.getMinutes()}-${t.getSeconds()}`;
+function say(text){ $('msg').textContent = text; }
+function entries(key){            // flatten the nested JSON into [{when: Date}]
+  const out = [];
+  for (const e of data[key]) {
+    if (!e || typeof e !== 'object') continue;
+    for (const [d, times] of Object.entries(e)) {
+      if (!times || typeof times !== 'object') continue;
+      for (const tm of Object.keys(times)) {
+        const [Y, M, D] = d.split('-').map(Number), [h, m, s] = tm.split('-').map(Number);
+        const when = new Date(Y, M - 1, D, h, m, s);
+        if (!isNaN(when)) out.push({when, key});
+      }
+    }
+  }
+  return out;
+}
+
+// ---- Logging with a second-tap confirmation ----
+let armed = null, armTimer = null;
+function tap(key){
+  clearTimeout(armTimer);
+  if (armed === key) { armed = null; addEntry(key); }
+  else { armed = key; armTimer = setTimeout(() => { armed = null; render(); }, CONFIRM_MS); }
+  render();
+}
+function addEntry(key){
+  const t = new Date();
+  data[key].push({[dateKey(t)]: {[timeKey(t)]: Math.floor(t / 1000)}});
+  if (!save()) data[key].pop(); else say('Logged.');
+}
+
+// ---- Rendering ----
+function buildButtons(){
+  CATEGORIES.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'log-btn'; b.id = 'btn-' + c.key; b.style.setProperty('--col', c.color);
+    b.innerHTML = '<span><b></b><small></small></span><span class="n"></span>';
+    b.onclick = () => tap(c.key);
+    $('buttons').appendChild(b);
+  });
+}
+function render(){
+  const today = dateKey(new Date());
+  CATEGORIES.forEach(c => {
+    const b = $('btn-' + c.key), all = entries(c.key);
+    b.classList.toggle('armed', armed === c.key);
+    b.querySelector('b').textContent = c.label;
+    b.querySelector('small').textContent = armed === c.key ? 'Tap again to log' : all.length + ' in total';
+    b.querySelector('.n').textContent = all.filter(e => dateKey(e.when) === today).length;
+  });
+  const recent = CATEGORIES.flatMap(c => entries(c.key)).sort((a, b) => b.when - a.when).slice(0, 15);
+  const ul = $('log'); ul.replaceChildren();
+  if (!recent.length) { const p = document.createElement('li'); p.className = 'empty'; p.textContent = 'Nothing logged yet.'; ul.appendChild(p); }
+  recent.forEach(e => {
+    const c = CATEGORIES.find(c => c.key === e.key), li = document.createElement('li');
+    li.style.setProperty('--col', c.color);
+    li.innerHTML = '<i></i><span></span><span></span>';
+    li.children[1].textContent = c.label;
+    li.children[2].textContent = e.when.toLocaleString([], {weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'});
+    ul.appendChild(li);
+  });
+}
+function tick(){
+  const now = new Date();
+  $('clock').textContent = now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false});
+  $('date').textContent = now.toLocaleDateString([], {weekday: 'long', day: 'numeric', month: 'long'});
+}
+
+// ---- Backup ----
+async function exportData(){
+  const text = JSON.stringify(data);
+  $('box').value = text; $('box').select();
+  try { await navigator.clipboard.writeText(text); say('Copied to the clipboard. Also shown in the box.'); }
+  catch(e){ say('Could not copy automatically. Select the text in the box and copy it.'); }
+}
+/*LZ-START*/
+// Reads backups made by the Scratch version (LZString "UTF16" compression).
+function lzDecompressUTF16(input){
+  const length = input.length, get = i => input.charCodeAt(i) - 32, reset = 16384;
+  const dict = [0, 1, 2], result = [];
+  let enlargeIn = 4, dictSize = 4, numBits = 3, entry, c, w;
+  let val = get(0), pos = reset, idx = 1;
+  function read(n){
+    let bits = 0, power = 1;
+    while (power !== Math.pow(2, n)) {
+      const b = val & pos; pos >>= 1;
+      if (pos === 0) { pos = reset; val = get(idx++); }
+      bits |= (b > 0 ? 1 : 0) * power; power <<= 1;
+    }
+    return bits;
+  }
+  switch (read(2)) {
+    case 0: c = String.fromCharCode(read(8)); break;
+    case 1: c = String.fromCharCode(read(16)); break;
+    default: return '';
+  }
+  dict[3] = c; w = c; result.push(c);
+  while (true) {
+    if (idx > length) return '';
+    let n = read(numBits);
+    if (n === 0) { dict[dictSize++] = String.fromCharCode(read(8)); n = dictSize - 1; enlargeIn--; }
+    else if (n === 1) { dict[dictSize++] = String.fromCharCode(read(16)); n = dictSize - 1; enlargeIn--; }
+    else if (n === 2) return result.join('');
+    if (enlargeIn === 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
+    if (dict[n]) entry = dict[n];
+    else if (n === dictSize) entry = w + w.charAt(0);
+    else return null;
+    result.push(entry);
+    dict[dictSize++] = w + entry.charAt(0);
+    enlargeIn--; w = entry;
+    if (enlargeIn === 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
+  }
+}
+/*LZ-END*/
+function importData(){
+  const text = $('box').value.trim();
+  if (!text) return say('Paste a backup into the box first.');
+  let obj = parseJSON(text);
+  if (!validData(obj)) { try { obj = parseJSON(lzDecompressUTF16(text)); } catch(e){ obj = null; } }
+  if (!validData(obj)) return say('That is not a valid backup. Nothing was changed.');
+  const count = o => CATEGORIES.reduce((n, c) => n + o[c.key].length, 0);
+  if (!confirm(`Replace your ${count(data)} saved entries with ${count(obj)} from this backup?`)) return say('Import cancelled.');
+  const old = data; data = obj;
+  CATEGORIES.forEach(c => { if (!Array.isArray(data[c.key])) data[c.key] = []; });
+  if (!save()) data = old; else say('Imported.');
+  render();
+}
+let delTimer = null;
+function deleteAll(){
+  const b = $('del');
+  if (!b.classList.contains('armed')) {
+    b.classList.add('armed'); b.textContent = 'Tap again to delete';
+    delTimer = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Delete all'; }, CONFIRM_MS + 1000);
+    return;
+  }
+  clearTimeout(delTimer); b.classList.remove('armed'); b.textContent = 'Delete all';
+  data = {}; CATEGORIES.forEach(c => data[c.key] = []);
+  if (save()) say('Everything deleted.');
+  render();
+}
+
+// ---- Start ----
+buildButtons(); render(); tick();
+setInterval(() => { tick(); render(); }, 1000);
+$('exp').onclick = exportData; $('imp').onclick = importData; $('del').onclick = deleteAll;
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
