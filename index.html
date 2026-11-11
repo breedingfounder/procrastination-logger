@@ -58,6 +58,34 @@ textarea{width:100%;height:7rem;font:.8rem ui-monospace,monospace;background:var
 .row button{padding:.7rem}
 #clear.armed{background:var(--p0);color:var(--bg);border-color:var(--p0)}
 
+/* Graph tab */
+.gctl{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0 1rem}
+.gctl select{flex:1 1 9rem;min-width:0;font:inherit;padding:.6rem;border-radius:.7rem;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.seg{display:flex;flex:1 1 12rem;border:1px solid var(--line);border-radius:.7rem;overflow:hidden;background:var(--card)}
+.seg button{flex:1;padding:.6rem .3rem;border:0;background:none;color:var(--mute);touch-action:manipulation}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg);font-weight:600}
+.stats{display:flex;gap:2rem;margin-bottom:.75rem}
+.stats b{display:block;font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.stats small{color:var(--mute)}
+#chart{background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:.5rem .25rem .25rem;min-height:8rem}
+#chart svg{display:block;width:100%;height:auto}
+#chart text{fill:var(--mute);font-size:10px;font-family:inherit}
+#chart text.now{fill:var(--ink);font-weight:700}
+#chart .grid{stroke:var(--line);stroke-width:1}
+#chart .sel{fill:var(--line);opacity:.45}
+#chart .bar{stroke:var(--card);stroke-width:1}
+#chart [data-i]{cursor:pointer;outline:none}
+#chart [data-i]:focus-visible{stroke:var(--p1);stroke-width:2}
+#chart .empty{padding:2rem 1rem;text-align:center}
+#legend{display:flex;flex-wrap:wrap;gap:.25rem 1rem;margin:.75rem 0 0;font-size:.85rem;color:var(--mute)}
+#legend span,.detail div{display:flex;align-items:center;gap:.4rem}
+.dot{width:.7rem;height:.7rem;border-radius:50%;background:var(--col);flex:none}
+.detail{margin-top:1rem;background:var(--card);border:1px solid var(--line);border-radius:1rem;padding:.9rem 1rem}
+.detail h2{margin:0 0 .5rem;font-size:1rem}
+.detail div{padding:.25rem 0}
+.detail div b{margin-left:auto;font-variant-numeric:tabular-nums}
+.detail .empty{color:var(--mute)}
+
 /* Tab bar */
 nav{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;gap:.25rem;background:var(--card);border-top:1px solid var(--line);
   padding:.4rem .5rem calc(.4rem + env(safe-area-inset-bottom,0px))}
@@ -89,6 +117,22 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,.entries:focus-v
 
   <section id="page-tally" role="tabpanel" aria-labelledby="tab-tally"><div class="cols" id="colsTally"></div></section>
   <section id="page-periods" role="tabpanel" aria-labelledby="tab-periods" hidden><div class="cols" id="colsPeriods"></div></section>
+  <section id="page-graph" role="tabpanel" aria-labelledby="tab-graph" hidden>
+    <h1>Time spent</h1>
+    <div class="gctl">
+      <select id="gCat" aria-label="Category"></select>
+      <div class="seg" role="group" aria-label="Group by">
+        <button id="g-day">Days</button><button id="g-week">Weeks</button><button id="g-month">Months</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div><b id="gTotal">0s</b><small>total</small></div>
+      <div><b id="gAvg">0s</b><small id="gAvgLbl">average per day</small></div>
+    </div>
+    <div id="chart"></div>
+    <p id="legend" hidden></p>
+    <div class="detail" id="detail" aria-live="polite"></div>
+  </section>
   <section id="page-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
     <h1>Settings</h1>
     <h2>Backup</h2>
@@ -109,6 +153,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,.entries:focus-v
   </button>
   <button role="tab" id="tab-periods" aria-selected="false">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M10 2.5h4M12 2.5V7M12 14l3-3M19 6.5l1.2-1.2"/></svg>Time periods
+  </button>
+  <button role="tab" id="tab-graph" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 20v-7M12 20V5M17 20v-10"/></svg>Graph
   </button>
   <button role="tab" id="tab-settings" aria-selected="false">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg>Settings
@@ -384,10 +431,119 @@ function renderCols(cols, mode){
 function render(){
   if (tab === 'tally') renderCols($('colsTally'), 'tally');
   else if (tab === 'periods') renderCols($('colsPeriods'), 'periods');
+  else if (tab === 'graph') renderGraph();
 }
 
+// ---- Graph: time per day / week / month, built from the saved time periods ----
+const GRAN = {day: {n: 14, unit: 'day', range: 'the last 14 days'}, week: {n: 12, unit: 'week', range: 'the last 12 weeks'}, month: {n: 12, unit: 'month', range: 'the last 12 months'}};
+let gran = 'day', gCat = '', gSel = null;       // gCat '' means all categories
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const fmtDur = ms => { const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : `${s}s`; };
+function buckets(g){                              // [{s, e}] oldest first, the last one contains today
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate(), out = [];
+  for (let i = GRAN[g].n - 1; i >= 0; i--) {
+    if (g === 'day') out.push({s: new Date(y, m, d - i), e: new Date(y, m, d - i + 1)});
+    else if (g === 'week') { const b = d - (now.getDay() + 6) % 7 - 7 * i; out.push({s: new Date(y, m, b), e: new Date(y, m, b + 7)}); }   // weeks start on Monday
+    else out.push({s: new Date(y, m - i, 1), e: new Date(y, m - i + 1, 1)});
+  }
+  return out;
+}
+function aggregate(bs, names){                    // ms per bucket per category; a period that crosses a boundary is split
+  const per = bs.map(() => names.map(() => 0)), lo = bs[0].s, hi = bs[bs.length - 1].e;
+  names.forEach((name, ci) => periods(name).forEach(p => {
+    if (p.end <= lo || p.start >= hi) return;
+    bs.forEach((b, bi) => { const ov = Math.min(p.end, b.e) - Math.max(p.start, b.s); if (ov > 0) per[bi][ci] += ov; });
+  }));
+  return per;
+}
+function niceScale(max){                          // axis top and step in "nice" numbers
+  if (!(max > 0)) return {top: 1, step: .25};
+  const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag;
+  return {step, top: Math.ceil(max / step - 1e-9) * step};
+}
+const fmtDay = (d, o) => d.toLocaleDateString([], o);
+function bucketTitle(b){
+  if (gran === 'day') return fmtDay(b.s, {weekday: 'long', day: 'numeric', month: 'long'});
+  if (gran === 'week') return `Week of ${fmtDay(b.s, {day: 'numeric', month: 'short'})} – ${fmtDay(new Date(b.e - 86400000 / 2), {day: 'numeric', month: 'short'})}`;
+  return fmtDay(b.s, {month: 'long', year: 'numeric'});
+}
+function drawChart(bs, per, idxs, sel){
+  const W = Math.max(280, $('chart').clientWidth || 340), H = 250, ml = 34, mr = 6, mt = 18, mb = 40;
+  const pw = W - ml - mr, ph = H - mt - mb, n = bs.length, band = pw / n, bw = Math.min(band * .7, 40);
+  const totals = per.map(r => idxs.reduce((s, ci) => s + r[ci], 0));
+  const max = Math.max(...totals), useMin = max < 90 * 60000, unit = useMin ? 60000 : 3600000;
+  const {top, step} = niceScale(max / unit), y = ms => mt + ph - ms / unit / top * ph;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="group" aria-label="Bar chart of time per ${GRAN[gran].unit}">`;
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    const yy = y(v * unit).toFixed(1);
+    s += `<line class="grid" x1="${ml}" x2="${W - mr}" y1="${yy}" y2="${yy}"/><text x="${ml - 6}" y="${(+yy + 3).toFixed(1)}" text-anchor="end">${+v.toFixed(2)}</text>`;
+  }
+  s += `<text x="${ml - 6}" y="10" text-anchor="start">${useMin ? 'minutes' : 'hours'}</text>`;
+  bs.forEach((b, i) => {
+    const x0 = ml + i * band, cx = x0 + band / 2, now = i === n - 1;
+    if (i === sel) s += `<rect class="sel" x="${x0.toFixed(1)}" y="${mt}" width="${band.toFixed(1)}" height="${ph}" rx="4"/>`;
+    let acc = 0;
+    idxs.forEach(ci => {
+      const ms = per[i][ci]; if (ms <= 0) return;
+      const h = Math.max(ms / unit / top * ph, 1); acc += h;
+      s += `<rect class="bar" style="fill:var(--p${ci % 6})" x="${(cx - bw / 2).toFixed(1)}" y="${(mt + ph - acc).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}"/>`;
+    });
+    const a = gran === 'month' ? fmtDay(b.s, {month: 'short'}) : String(b.s.getDate());
+    const c = gran === 'day' ? fmtDay(b.s, {weekday: 'narrow'}) : gran === 'week' ? fmtDay(b.s, {month: 'short'}) : (i === 0 || b.s.getMonth() === 0 ? String(b.s.getFullYear()) : '');
+    s += `<text class="${now ? 'now' : ''}" x="${cx.toFixed(1)}" y="${H - 22}" text-anchor="middle">${a}</text><text class="${now ? 'now' : ''}" x="${cx.toFixed(1)}" y="${H - 9}" text-anchor="middle">${c}</text>`;
+    const label = `${bucketTitle(b)}: ${fmtDur(totals[i])}`.replace(/"/g, '');
+    s += `<rect data-i="${i}" x="${x0.toFixed(1)}" y="0" width="${band.toFixed(1)}" height="${H}" fill="transparent" tabindex="0" role="button" aria-label="${label}"/>`;
+  });
+  $('chart').innerHTML = s + '</svg>';
+}
+function renderGraph(){
+  const names = Object.keys(data);
+  if (gCat && !hasOwn(data, gCat)) gCat = '';
+  const picker = $('gCat'); picker.replaceChildren();
+  const all = el('option', '', 'All categories'); all.value = ''; picker.appendChild(all);
+  names.forEach(nm => { const o = el('option', '', nm); o.value = nm; picker.appendChild(o); });
+  picker.value = gCat;
+  Object.keys(GRAN).forEach(g => $('g-' + g).setAttribute('aria-pressed', g === gran ? 'true' : 'false'));
+
+  const bs = buckets(gran), per = aggregate(bs, names);
+  const idxs = gCat ? [names.indexOf(gCat)] : names.map((_, i) => i);
+  const totals = per.map(r => idxs.reduce((s, ci) => s + r[ci], 0)), sum = totals.reduce((a, b) => a + b, 0);
+  const si = gSel === null ? bs.length - 1 : Math.min(gSel, bs.length - 1);
+  $('gTotal').textContent = fmtDur(sum);
+  $('gAvg').textContent = fmtDur(sum / bs.length);
+  $('gAvgLbl').textContent = `average per ${GRAN[gran].unit}`;
+
+  const legend = $('legend'); legend.replaceChildren(); legend.hidden = !!gCat || !names.length;
+  names.forEach((nm, i) => { const sp = el('span'), dot = el('i', 'dot'); sp.style.setProperty('--col', `var(--p${i % 6})`); sp.append(dot, el('span', '', nm)); legend.appendChild(sp); });
+
+  const detail = $('detail'); detail.replaceChildren();
+  if (!sum) {
+    $('chart').replaceChildren(el('p', 'empty', names.length ? `No time periods recorded in ${GRAN[gran].range}${gCat ? ' for this category' : ''} yet. Record some in the Time periods tab.` : 'No categories yet.'));
+    detail.hidden = true; return;
+  }
+  detail.hidden = false;
+  drawChart(bs, per, idxs, si);
+  detail.appendChild(el('h2', '', `${bucketTitle(bs[si])} · ${fmtDur(totals[si])}`));
+  const rows = idxs.filter(ci => per[si][ci] > 0).sort((a, b) => per[si][b] - per[si][a]);
+  if (!rows.length) detail.appendChild(el('p', 'empty', 'Nothing recorded in this period.'));
+  rows.forEach(ci => {
+    const row = el('div'), dot = el('i', 'dot'); row.style.setProperty('--col', `var(--p${ci % 6})`);
+    row.append(dot, el('span', '', names[ci]), el('b', '', fmtDur(per[si][ci])));
+    detail.appendChild(row);
+  });
+}
+function pickBucket(e){
+  const t = e.target.closest && e.target.closest('[data-i]');
+  if (t && (e.type === 'click' || e.key === 'Enter' || e.key === ' ')) { if (e.type !== 'click') e.preventDefault(); gSel = +t.dataset.i; renderGraph(); }
+}
+$('chart').onclick = pickBucket; $('chart').onkeydown = pickBucket;
+$('gCat').onchange = () => { gCat = $('gCat').value; renderGraph(); };
+Object.keys(GRAN).forEach(g => { $('g-' + g).onclick = () => { gran = g; gSel = null; renderGraph(); }; });
+window.addEventListener('resize', () => { if (tab === 'graph') renderGraph(); });
+
 // ---- Tabs ----
-const TABS = ['tally', 'periods', 'settings'];
+const TABS = ['tally', 'periods', 'graph', 'settings'];
 let tab = 'tally';
 function setTab(t){
   tab = t;
@@ -395,7 +551,7 @@ function setTab(t){
     $('page-' + n).hidden = n !== t;
     $('tab-' + n).setAttribute('aria-selected', n === t ? 'true' : 'false');
   });
-  $('top').hidden = t === 'settings';
+  $('top').hidden = t === 'settings' || t === 'graph';
   render();
 }
 TABS.forEach(n => { $('tab-' + n).onclick = () => setTab(n); });

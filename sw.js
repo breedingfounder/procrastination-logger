@@ -1,7 +1,7 @@
 // Makes the app open offline. Serves the saved copy instantly, then refreshes it in the
 // background, so a new version shows up the next time you open the app (close and reopen it).
 // Bump the version number to throw away the old saved files, for example after renaming a file.
-const CACHE = 'procrastination-logger-v3';
+const CACHE = 'procrastination-logger-v4';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
